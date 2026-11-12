@@ -367,6 +367,9 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private final ConnectivityManager.NetworkCallback networkCallback = new ConnectivityManager.NetworkCallback() {
         @Override
         public void onAvailable(@NonNull Network network) {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M && startPending != null) {
+                handler.post(openWhenOnline);
+            }
             handler.post(MainActivity.this::updateWifiLabel);
         }
 
@@ -521,7 +524,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         ambient = findViewById(R.id.ambient);
         // The glow is one bitmap, so its alpha can be applied while drawing it. Otherwise every frame of
         // a fade renders it into a full-screen offscreen buffer first.
-        ambient.forceHasOverlappingRendering(false);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) ambient.forceHasOverlappingRendering(false);
         ambientGlow = cfg.ambientGlow;
         glowSnap = cfg.glowSnap;
         appGlow = cfg.appGlow;
@@ -530,7 +533,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         hero = findViewById(R.id.hero);
         // The hero is now a group (name, and the cinematic lines): without this every fade of the default
         // shelf would render it through an offscreen buffer first, as the glow above notes.
-        hero.forceHasOverlappingRendering(false);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) hero.forceHasOverlappingRendering(false);
         heroMeta = findViewById(R.id.heroMeta);
         heroDots = findViewById(R.id.heroDots);
         heroArt = findViewById(R.id.heroArt);
@@ -855,11 +858,11 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         topMenu = cfg.topMenu;
         wifiIconOnly = iconOnlyButtons && cfg.wifiLabelWidth <= 0;
         if (cfg.wifiStatusColor) {
-            wifiPlainTint = btnWifi.getCompoundDrawableTintList();
-            wifiOnlineTint = getColorStateList(R.color.pill_icon_online);
+            wifiPlainTint = compoundTint(btnWifi);
+            wifiOnlineTint = androidx.core.content.ContextCompat.getColorStateList(this, R.color.pill_icon_online);
             if (cfg.wifiStatusWarnings) {
-                wifiNoInternetTint = getColorStateList(R.color.pill_icon_no_internet);
-                wifiOfflineTint = getColorStateList(R.color.pill_icon_offline);
+                wifiNoInternetTint = androidx.core.content.ContextCompat.getColorStateList(this, R.color.pill_icon_no_internet);
+                wifiOfflineTint = androidx.core.content.ContextCompat.getColorStateList(this, R.color.pill_icon_offline);
             }
         }
         if (cfg.topMenu) {
@@ -889,7 +892,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         iconOnlyVpn = vpnPill && cfg.iconOnlyVpn;
         if (iconOnlyVpn) {
             vpnPlainBackground = btnVpn.getBackground().getConstantState();
-            vpnPlainInk = btnVpn.getCompoundDrawableTintList();
+            vpnPlainInk = compoundTint(btnVpn);
             makeIconOnly(btnVpn);
         }
         btnSettings.setOnLongClickListener(v -> {
@@ -958,11 +961,17 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             }
         }
 
-        ConnectivityManager cm = getSystemService(ConnectivityManager.class);
+        ConnectivityManager cm = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
         TvInputManager tim = (TvInputManager) getSystemService(TV_INPUT_SERVICE);
         if (tim != null) tim.registerCallback(inputCallback, handler);
         if (cm != null) {
-            cm.registerDefaultNetworkCallback(networkCallback);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                cm.registerDefaultNetworkCallback(networkCallback);
+            } else {
+                cm.registerNetworkCallback(new NetworkRequest.Builder()
+                        .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                        .build(), networkCallback);
+            }
             cm.registerNetworkCallback(new NetworkRequest.Builder()
                     .addTransportType(NetworkCapabilities.TRANSPORT_VPN)
                     .removeCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
@@ -1238,11 +1247,13 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
     /** True when PackageManager reports apps changed since the last rebuild (one binder call). */
     private boolean packagesChangedSinceRebuild() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return true;
         ChangedPackages changed = getPackageManager().getChangedPackages(packageSequence);
         return changed != null && !changed.getPackageNames().isEmpty();
     }
 
     private int currentPackageSequence(int since) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return since;
         ChangedPackages changed = getPackageManager().getChangedPackages(since);
         return changed != null ? changed.getSequenceNumber() : since;
     }
@@ -1385,7 +1396,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         unregisterReceiver(packageReceiver);
         if (openOnStartOnWake) unregisterReceiver(wakeReceiver);
         wallpaperPlayer.close();
-        ConnectivityManager cm = getSystemService(ConnectivityManager.class);
+        ConnectivityManager cm = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
         TvInputManager tim = (TvInputManager) getSystemService(TV_INPUT_SERVICE);
         if (tim != null) tim.unregisterCallback(inputCallback);
         if (cm != null) {
@@ -2004,7 +2015,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         heroDots.setVisibility(heroDotsShown ? View.VISIBLE : View.GONE);
         heroArt.setVisibility(heroArtAlpha > 0f ? View.VISIBLE : View.GONE);
         // One stretched bitmap: apply its alpha while drawing instead of through an offscreen buffer.
-        heroArt.forceHasOverlappingRendering(false);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) heroArt.forceHasOverlappingRendering(false);
         if (scrimPercent <= 0) return;   // cinematic_scrim 0: no scrim at all
         View scrim = findViewById(R.id.heroScrim);
         Drawable shade = scrimDrawable();
@@ -2320,7 +2331,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         if (mem != null) appendStat(line, getString(R.string.stats_memory, mem[0], mem[1]));
         String free = formatGb(getResources(), Environment.getDataDirectory().getFreeSpace());
         if (!free.isEmpty()) appendStat(line, getString(R.string.stats_storage, free));
-        return StatsText.forLocale(line.toString(), getResources().getConfiguration().getLocales().get(0));
+        return StatsText.forLocale(line.toString(), androidx.core.os.ConfigurationCompat.getLocales(getResources().getConfiguration()).get(0));
     }
 
     // -1: need another sample. -2: this source cannot be read (Android 9 hides /proc/stat from apps).
@@ -2606,7 +2617,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             button.setId(View.generateViewId());
             logo.setBounds(0, 0, size, size);
             button.setCompoundDrawablesRelative(logo, null, null, null);
-            button.setCompoundDrawableTintList(null);
+            setCompoundTint(button, null);
             button.setContentDescription(label);
             Intent target = launch;
             // An input: action switches the TV input, as the tile for the same app does.
@@ -2737,7 +2748,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         // Spain (es-ES) and Catalan: "Buenas tardes" into the evening; "Buenas noches" from 21.
         // Latin American Spanish (es-MX, es-AR, …) keeps the default hours: evening strings are also
         // «Buenas noches», and there «Buenas noches» from ~17 matches local use better than Spain's 21.
-        Locale locale = getResources().getConfiguration().getLocales().get(0);
+        Locale locale = androidx.core.os.ConfigurationCompat.getLocales(getResources().getConfiguration()).get(0);
         String lang = locale.getLanguage();
         String country = locale.getCountry();
         if ("in".equals(lang) || "id".equals(lang)) {
@@ -3025,8 +3036,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             ColorStateList tint = online ? wifiOnlineTint : wifiPlainTint;
             // wifi_status_warnings: orange while connected but not validated (a captive portal), red while offline.
             if (wifiNoInternetTint != null) tint = !online ? wifiOfflineTint : validated ? wifiOnlineTint : wifiNoInternetTint;
-            if (wifiOnlineTint != null && btnWifi.getCompoundDrawableTintList() != tint) {
-                btnWifi.setCompoundDrawableTintList(tint);
+            if (wifiOnlineTint != null && compoundTint(btnWifi) != tint) {
+                setCompoundTint(btnWifi, tint);
             }
         }
     }
@@ -3100,9 +3111,32 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         addFocusAction(settings, marigold::turn);
     }
 
+    private boolean inputHidden(TvInputInfo input) {
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && input.isHidden(this);
+    }
+
+    private CharSequence inputCustomLabel(TvInputInfo input) {
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.N ? input.loadCustomLabel(this) : null;
+    }
+
+    private static ColorStateList compoundTint(TextView view) {
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+                ? view.getCompoundDrawableTintList() : view.getTextColors();
+    }
+
+    private static void setCompoundTint(TextView view, ColorStateList tint) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            view.setCompoundDrawableTintList(tint);
+        } else {
+            for (Drawable drawable : view.getCompoundDrawablesRelative()) {
+                if (drawable != null) drawable.mutate().setTintList(tint);
+            }
+        }
+    }
+
     private static void setFestiveIcon(TextView pill, Drawable icon) {
         // The pills tint their icons to follow focus; the festive ones keep their own colours.
-        pill.setCompoundDrawableTintList(null);
+        setCompoundTint(pill, null);
         pill.setCompoundDrawablesRelativeWithIntrinsicBounds(icon, null, null, null);
     }
 
@@ -3192,7 +3226,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                 btnVpn.setContentDescription(getString(up ? R.string.vpn : R.string.vpn_off));
                 btnVpn.setBackground(up ? VpnBadge.pillBackground(true, density) : vpnPlainBackground.newDrawable());
                 btnVpn.setCompoundDrawablesRelativeWithIntrinsicBounds(VpnBadge.iconOnlyLock(up), 0, 0, 0);
-                btnVpn.setCompoundDrawableTintList(up ? ink : vpnPlainInk);
+                setCompoundTint(btnVpn, up ? ink : vpnPlainInk);
                 btnVpn.setVisibility(View.VISIBLE);
                 return;
             }
@@ -3200,7 +3234,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             btnVpn.setTextColor(ink);
             btnVpn.setBackground(VpnBadge.pillBackground(up, density));
             btnVpn.setCompoundDrawablesRelativeWithIntrinsicBounds(up ? R.drawable.ic_lock : 0, 0, 0, 0);
-            btnVpn.setCompoundDrawableTintList(ink);
+            setCompoundTint(btnVpn, ink);
         }
         btnVpn.setVisibility(View.VISIBLE);
     }
@@ -3223,7 +3257,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         if (!any && tim != null) {
             for (TvInputInfo info : tim.getTvInputList()) {
                 // Inputs hidden in Settings > Inputs are left out of the menu, so they don't count here either.
-                if (info.isPassthroughInput() && !info.isHidden(this)) {
+                if (info.isPassthroughInput() && !inputHidden(info)) {
                     any = true;
                     break;
                 }
@@ -3452,7 +3486,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             for (TvInputInfo info : inputs) {
                 String parent = info.getParentId();
                 if (parent == null || !inputIds.contains(parent)) continue;
-                if (!info.isPassthroughInput() || info.isHidden(this)) continue;
+                if (!info.isPassthroughInput() || inputHidden(info)) continue;
                 List<TvInputInfo> onPort = cecDevices.get(parent);
                 if (onPort == null) cecDevices.put(parent, onPort = new ArrayList<>());
                 onPort.add(info);
@@ -3492,7 +3526,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                     }
                 }
                 // Inputs hidden in the TV's Settings > Inputs stay out of the menu too.
-                if (!info.isPassthroughInput() || info.isHidden(this)) continue;
+                if (!info.isPassthroughInput() || inputHidden(info)) continue;
                 // input_sources can leave out ports the board reports but the set does not have ("HW8=-").
                 if (Integer.valueOf(-1).equals(mappedSource(info.getId()))) continue;
                 // A CEC device's row is added with its port, below.
@@ -3501,7 +3535,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                 String label = l == null ? info.getId() : l.toString();
                 boolean hdmi = info.getType() == TvInputInfo.TYPE_HDMI;
                 if (hdmi && !label.toUpperCase(Locale.ROOT).contains("HDMI")) label = "HDMI " + label;
-                CharSequence custom = InputNames.tidy(info.loadCustomLabel(this));
+                CharSequence custom = InputNames.tidy(inputCustomLabel(info));
                 boolean named = custom != null && custom.length() > 0 && !custom.toString().equals(label);
                 if (!hdmi && rows.getChildCount() > 0 && !sawNonHdmi) {
                     View line = addSeparator(rows);
@@ -3514,7 +3548,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                     // Settings > Inputs), then the port. Opening the device's input also makes it the CEC
                     // active source, which wakes it.
                     for (TvInputInfo device : devices) {
-                        CharSequence name = InputNames.tidy(device.loadCustomLabel(this));
+                        CharSequence name = InputNames.tidy(inputCustomLabel(device));
                         if (name == null || name.length() == 0) name = named ? custom : device.loadLabel(this);
                         String deviceLabel = name == null || name.length() == 0 ? label : name + " \u00B7 " + label;
                         final String deviceId = device.getId();

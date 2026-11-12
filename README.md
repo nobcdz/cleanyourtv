@@ -1,3 +1,7 @@
+## 简体中文 · 安装电视桌面
+
+适用于 **Android 5.0（API 21）及以上**的电视和盒子。从 [Releases](https://github.com/nobcdz/cleanyourtv/releases) 下载 `CleanYourTV.apk`，然后按[中文 ADB 安装指南](README.zh-CN.md#用-adb-安装桌面)从电脑安装。只装桌面无需编译源码，也无需先清理电视。
+
 <p align="center">
   <a href="https://cleanyour.tv"><img src="https://raw.githubusercontent.com/Gathin23/cleanyourtv/main/docs/banner.png" alt="CleanYourTV. Your TV, minus the ads. Strip the bloatware from any Android TV or Google TV over Wi-Fi and replace the ad-filled home screen with a clean launcher that looks like an Apple TV. No root, no cable, nothing uninstalled, and a one-line restore." width="800"></a>
 </p>
@@ -27,6 +31,7 @@
 
 | You have | Go to |
 |---|---|
+| **An Android TV 5.0 or newer and want the launcher APK** | Download `CleanYourTV.apk` from [this fork's Releases](https://github.com/nobcdz/cleanyourtv/releases) and sideload it with `adb install -r CleanYourTV.apk`. |
 | **An Android TV or Google TV** | [Quick start](#quick-start): a coding assistant does the work in about fifteen minutes. |
 | **A Samsung, LG, Roku, Vizio or Hisense VIDAA TV** | [cleanyour.tv/not-android](https://cleanyour.tv/not-android): CleanYourTV can't run there, but you can turn off the tracking with your remote. |
 | **A phone or laptop, no coding agent** | One of the [community apps](https://cleanyour.tv/app) for Android phones, Mac and Windows, made by independent developers. |
@@ -277,10 +282,8 @@ debloat list. What the audit cannot do is prove intent: [docs/privacy.md](docs/p
 
 ## The launcher
 
-A small native home screen for Android TV: **about 572 KB**, plain Java, built for TVs with 1 GB of RAM.
-No blur, no video, no network permission, no background services. The **TV** needs Android 8.0 (API 26)
-or newer, the `minSdk` in [`launcher/app/build.gradle`](launcher/app/build.gradle); what is left on an older
-set is in [Troubleshooting](docs/TROUBLESHOOTING.md).
+A native Java home screen for Android TV. This fork supports **Android 5.0 (API 21) or newer**.
+See [`launcher/app/build.gradle`](launcher/app/build.gradle) for the build configuration.
 
 | What | How it works |
 |---|---|

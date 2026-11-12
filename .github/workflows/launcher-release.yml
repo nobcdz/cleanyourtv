@@ -1,0 +1,53 @@
+name: Publish launcher APK
+
+on:
+  push:
+    tags: ['launcher-v*']
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3.2.2
+        with:
+          packages: platforms;android-34 build-tools;34.0.0
+      - uses: gradle/actions/setup-gradle@748248ddd2a24f49513d8f472f81c3a07d4d50e1 # v4.4.4
+      - name: Build and verify signed APK
+        working-directory: launcher
+        env:
+          LAUNCHER_RELEASE_KEYSTORE_BASE64: ${{ secrets.LAUNCHER_RELEASE_KEYSTORE_BASE64 }}
+          LAUNCHER_RELEASE_STORE_PASSWORD: ${{ secrets.LAUNCHER_RELEASE_STORE_PASSWORD }}
+          LAUNCHER_RELEASE_KEY_ALIAS: ${{ secrets.LAUNCHER_RELEASE_KEY_ALIAS }}
+          LAUNCHER_RELEASE_KEY_PASSWORD: ${{ secrets.LAUNCHER_RELEASE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          : "${LAUNCHER_RELEASE_KEYSTORE_BASE64:?Missing release keystore secret}"
+          : "${LAUNCHER_RELEASE_STORE_PASSWORD:?Missing release store password secret}"
+          : "${LAUNCHER_RELEASE_KEY_ALIAS:?Missing release key alias secret}"
+          : "${LAUNCHER_RELEASE_KEY_PASSWORD:?Missing release key password secret}"
+          export LAUNCHER_RELEASE_KEYSTORE="$(mktemp)"
+          trap 'rm -f -- "$LAUNCHER_RELEASE_KEYSTORE"' EXIT
+          printf '%s' "$LAUNCHER_RELEASE_KEYSTORE_BASE64" | base64 --decode > "$LAUNCHER_RELEASE_KEYSTORE"
+          unset LAUNCHER_RELEASE_KEYSTORE_BASE64
+          bash gradlew --no-daemon testReleaseUnitTest lintRelease assembleRelease
+          apk=app/build/outputs/apk/release/app-release.apk
+          "$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --min-sdk-version 21 "$apk"
+          cp "$apk" "$RUNNER_TEMP/CleanYourTV.apk"
+      - name: Publish to GitHub Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" "$RUNNER_TEMP/CleanYourTV.apk" \
+            --verify-tag --title "CleanYourTV ${GITHUB_REF_NAME#launcher-}" --generate-notes

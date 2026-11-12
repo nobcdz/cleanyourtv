@@ -57,7 +57,7 @@ to them for the detail.
   Wireless debugging still off. If 5555 still answers with USB debugging kept on, switch that off too.
   Only the tool's "closed" counts. Port 5555 is plaintext.
 - **Stop and say so** when the TV refuses: `pm disable-user` refused for every package, a sideload that
-  fails verification, or an SDK below the launcher's `minSdk` 26. Do not retry in a loop, and do not lower
+  fails verification, or an SDK below the `minSdk` of the APK being installed. Do not retry in a loop, and do not lower
   `minSdk` or hand over an APK built elsewhere.
 - **Not an Android TV?** No ADB port at all, or the set identifies as Tizen, webOS, Roku OS, VIDAA or
   SmartCast: stop, nothing here applies. Send the person to https://cleanyour.tv/not-android, which turns
@@ -79,12 +79,12 @@ share their TV's list afterwards, follow [`docs/workflows/tv-list.md`](docs/work
 | `CODE_OF_CONDUCT.md` | Includes the rule against publishing device identifiers, Wi-Fi names and IPs. |
 | `examples/` | One folder per tested TV model: `debloat.txt`, `tv.json` (its row in the TV tables), sometimes a `README.md` and a `config.json`. Indexed in `examples/README.md`, whose table is generated too. |
 | `docs/` | `docs/TROUBLESHOOTING.md`, the module-card contract (`docs/modules.md`), `docs/devices/` for models with notes but no tested list, and the [workflows](#workflows). |
-| `launcher/` | The reference launcher, package `com.gathin.tvhome`: plain Java, AndroidX RecyclerView and DynamicAnimation, `minSdk` 26, no `INTERNET` permission. |
+| `launcher/` | The reference launcher, package `com.gathin.tvhome`: plain Java, AndroidX RecyclerView and DynamicAnimation, `minSdk` 21 in this fork, no `INTERNET` permission. |
 | `themes/` | One folder per theme: `config.json`, a required `screenshot.jpg`, optional wallpapers. Keys are documented in `themes/README.md`. |
 | `addons/` | Optional module-card apps, each its own Gradle project, never built into the launcher. |
 | `tools/` | The ADB client (`tv.py`) and the scripts, listed in the README's Tools table. Shell scripts have PowerShell twins. Each script's usage is in its first lines, and the larger ones have a guide beside them (`tools/*.md`): read it before running the script. |
 | `tests/` | Python `unittest` suite: list format, README tables, press counts, themes, add-ons, the Home guard and the tools against fake TVs. |
-| `.github/workflows/` | `ci.yml` (tests, launcher build, APK size gate), `addons.yml`, `maintainer-bot.yml`. |
+| `.github/workflows/` | `ci.yml` (tests and launcher build), `launcher-release.yml` (signed APK releases for this fork), `addons.yml`, `maintainer-bot.yml`. |
 | `.github/maintainer/MAINTAINER.md` | The review policy the maintainer and the PR bot apply. |
 | `.github/pull_request_template.md` | The PR checklist. Fill it in. |
 
@@ -99,7 +99,7 @@ The core stays small on purpose. Pick the smallest home that fits (CONTRIBUTING,
 | A new look: colours, wallpaper, dock, columns, that existing config keys can carry | `themes/<name>/` |
 | A widget or tile that can be its own small app | `addons/<name>/`, as a module card that never touches `launcher/` |
 | A whole new launcher, a heavy restyle, a port to another platform, a lower `minSdk`, new permissions or network access, Fire TV Home takeover, a changed default for every TV | Your own repository, plus one row in `SHOWCASE.md` |
-| Safety rules in `PROMPT.md`, the Home-safety logic in the scripts, protected packages, CI and workflows, the APK size gate | Open an issue for the maintainer; do not change it in a PR |
+| Safety rules in `PROMPT.md`, the Home-safety logic in the scripts, protected packages, upstream CI and workflows | Open an issue before proposing these changes upstream |
 
 Every PR is reviewed by the maintainer and by a bot that apply `.github/maintainer/MAINTAINER.md`: read its
 verdicts before a non-trivial PR. Changes to the Home or launch path (Home key, boot, return to Home, the
@@ -128,7 +128,6 @@ use it and ends with the check to run.
 |---|---|
 | Tests, as CI runs them | `tools/venv/bin/python -m unittest discover -s tests -v` after `python3 -m venv tools/venv` and `tools/venv/bin/pip install -r tools/requirements.txt`. On `main`, CI sets `CLEANYOURTV_STRICT=1`, and its "README tables" job checks that the TV tables and counts are what `tools/gen_tables.py` writes. On Windows the suites that drive `tools/*.sh` report as skipped: they need a POSIX shell, and CI runs them. |
 | Launcher, if you touched `launcher/` | JDK 17, Android SDK platform 34, build-tools 34.0.0. In `launcher/`: `./gradlew --no-daemon testReleaseUnitTest lintRelease assembleRelease`. Lint must stay at zero errors. |
-| APK size gate | `launcher/app/build/outputs/apk/release/app-release.apk` must be under 589,824 B (576 KB). Linux: `stat -c %s`, macOS: `stat -f %z`. |
 | README rows | A new list adds only its folder, with a `tv.json`: the TV tables, the brand grid and the counts are generated after merging, so leave them alone. A theme has its row in `themes/README.md`; an add-on in `addons/README.md`. |
 | One topic per PR | A TV list never rides inside a launcher feature PR. A device's list plus small fixes for that same device can be one PR. |
 | Tested on | Say which TV, Android version and firmware you tested on, in the PR template's "Tested on" line. |
@@ -141,7 +140,7 @@ use it and ends with the check to run.
 
 Never do these in a PR:
 
-- **No prebuilt APKs or binaries** in the repo, not even as CI artifacts. People build from source.
+- **Keep generated APKs out of Git.** This fork distributes signed launcher APKs as GitHub Release assets.
 - **No uninstalling.** No `pm uninstall` in a list or a script. `pm hide` or `pm block` only with the matching
   undo written in the list header.
 - **No network in the launcher:** no `INTERNET` permission, no network features, no analytics or telemetry, no
@@ -157,11 +156,10 @@ Never do these in a PR:
   already has the optional DNS extra; a note that Private DNS works on that TV is fine.
 - **No secrets or identifiers** in commits, lists or screenshots: no IP addresses, Wi-Fi names, account emails,
   serial numbers, Android IDs, MAC addresses or ADB keys. Use `<tv ip>` or `192.168.1.50` in docs.
-- **Don't edit `.github/workflows/`** or the APK size gate in a normal PR. A PR whose main content is a new CI
-  workflow that builds or publishes releases is closed.
+- Keep this fork's release workflow out of upstream PRs.
 - **No root, no getting around app-store protection, no private builds** others cannot reproduce from this repo.
 - **No extras added to the PROMPT flow** beyond debloating and the launcher.
-- **Don't relax `minSdk`** (26) or the launcher's permissions; those are forks for `SHOWCASE.md`.
+- Keep upstream's `minSdk` (26) and permission policy when proposing upstream PRs.
 - **Blur or crop** Wi-Fi names, people's names and cities (the top bar, a theme's `greeting_name`) before a
   screenshot goes anywhere public. No TV Settings screenshots that show accounts, emails or device names.
   From `tools/tv.py --probe`, `getprop` and backups, quote only the model, Android version and firmware build.

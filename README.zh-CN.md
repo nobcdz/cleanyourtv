@@ -17,7 +17,27 @@
 
 通过局域网连接 Android TV 或 Google TV，停用不需要的预装应用、广告和遥测服务，并在兼容设备上安装简洁的原生桌面。无需 root、刷机或 USB 数据线；清理工具采用停用方式，不卸载系统应用，并提供恢复脚本。
 
-本文介绍通用功能和使用方法。不同机型、地区和固件的应用包及限制可能不同，请先核对自己的设备。功能变化以[英文 README](README.md)为准，具体机型记录见[机型清单](examples/README.md)。
+本分支的桌面支持 **Android 5.0（API 21）及以上**。如果只想装桌面，按下面的步骤安装即可。需要清理预装应用时，再查看[机型清单](examples/README.md)，核对型号、地区和固件。
+
+## 用 ADB 安装桌面
+
+1. **下载 APK。** 在[本分支的 Releases](https://github.com/nobcdz/cleanyourtv/releases) 展开「Assets」，下载 `CleanYourTV.apk`。如果还没有这个文件，说明签名版尚未发布。
+2. **准备 ADB。** 电脑只需解压 [Android SDK 平台工具](https://developer.android.com/tools/releases/platform-tools?hl=zh-cn)。Windows 用户可将 APK 放进 `platform-tools` 文件夹，再在该文件夹打开 PowerShell。
+3. **开启电视的 ADB 调试。** 让电脑和电视连到同一局域网。在电视的「设置 → 关于」找到「版本号（Build）」，通常连续按七次确定即可启用开发者选项。返回设置，打开「USB 调试」。如果还有单独的「网络调试」或「ADB 调试」，也要打开。最后在网络设置中查看电视的 IP。菜单名称可能因固件而异。
+4. **连接并安装。** 把下面的示例 IP 换成电视的 IP。若电视使用配对码和动态端口，先按[无线调试说明](https://developer.android.com/tools/adb?hl=zh-cn#wireless)配对，再使用电视显示的连接端口。
+
+   ```powershell
+   .\adb.exe connect 192.168.1.50:5555
+   .\adb.exe devices
+   .\adb.exe -s 192.168.1.50:5555 install -r CleanYourTV.apk
+   .\adb.exe -s 192.168.1.50:5555 shell am start -W -n com.gathin.tvhome/.MainActivity
+   ```
+
+   macOS 或 Linux 在当前目录使用 `./adb`，已配置 PATH 则直接使用 `adb`。如果电视弹出调试授权或安装确认，用遥控器确认。设备列表显示 `device` 后再安装，看到 `Success` 后即可打开桌面。
+
+安装完成后也可以从电视的应用列表打开 CleanYourTV。默认桌面能否在系统设置中切换，取决于电视固件。安装完毕可在电视上关闭网络 ADB 调试。
+
+**备选方式：U 盘安装。** 把 APK 拷到 U 盘，在电视文件管理器中打开。电视需要允许从该文件管理器安装应用。
 
 **Samsung、LG、Roku 或其他非 Android 电视？** CleanYourTV 无法在这些电视上运行，但你仍可以用遥控器一步步关闭跟踪功能：[cleanyour.tv/not-android](https://cleanyour.tv/not-android)
 
@@ -33,14 +53,14 @@
 
 各品牌需要保留的系统组件不同。[操作提示词](PROMPT.md)会引导编程助手先检查实际设备，再确认你使用哪些应用和功能。
 
-## 快速开始
+## 备份与清理预装应用
 
 准备一台与电视连接同一局域网的电脑，以及可以运行终端命令的编程助手，例如 [Claude Code](https://claude.com/product/claude-code)、[Codex](https://github.com/openai/codex) 或 [Gemini CLI](https://github.com/google-gemini/gemini-cli)。
 
 | 步骤 | 操作 |
 |---|---|
 | 1. 电视端 | 打开「设置 → 设备偏好设置 → 关于」，在「版本号 / Build」上连续按七次确定，返回后进入开发者选项，开启 USB 调试。如果另有网络调试或 ADB 调试开关，也需要开启。菜单名称因机型而异。 |
-| 2. 电脑端 | 先克隆仓库并在助手中打开该文件夹（`git clone https://github.com/Gathin23/cleanyourtv`），再将 [`PROMPT.md`](PROMPT.md) 的内容交给助手，填写电视型号。 |
+| 2. 电脑端 | 先克隆仓库并在助手中打开该文件夹（`git clone https://github.com/nobcdz/cleanyourtv.git`），再将 [`PROMPT.md`](PROMPT.md) 的内容交给助手，填写电视型号。 |
 | 3. 确认需求 | 在电视上接受调试授权，告诉助手常用应用、底部快捷栏中的应用，以及是否保留语音助手、Chromecast 和系统更新。 |
 | 4. 检查结果 | 按提示完成备份、清理和安装，检查应用启动、遥控器操作、输入源和恢复路径。 |
 
@@ -95,7 +115,7 @@
 
 ## 支持哪些设备
 
-清理清单面向 **Android TV / Google TV**；当前桌面 APK 要求 **Android 8.0（API 26）或更高版本**。社区提供了多种电视与电视盒子的配置；其中一些设备运行的 Android 版本低于桌面的最低要求，清理清单不代表桌面可安装。请在[机型清单](examples/README.md)中核对型号、地区和固件，阅读对应目录的说明，再使用停用列表。
+清理清单面向 **Android TV / Google TV**。本分支的桌面 APK 要求 **Android 5.0（API 21）或更高版本**。使用清理清单前，请在[机型清单](examples/README.md)中核对型号、地区和固件，并阅读对应目录的说明。
 
 - Samsung Tizen 和 LG webOS 不能直接运行本项目的 Android 桌面；[docs/devices/samsung-tizen.md](docs/devices/samsung-tizen.md) 记录了一台 2021 年 Tizen 机型在局域网里暴露的接口（没有 ADB，因而无法停用应用），社区移植项目可参考[社区作品](SHOWCASE.md)。如需在 Samsung、LG、Roku 等非 Android 电视上关闭跟踪功能，请看 [cleanyour.tv/not-android](https://cleanyour.tv/not-android)。
 - Fire TV 的清理记录可供手动适配；[操作提示词](PROMPT.md)不适用于 Fire TV，Fire OS 也限制替换默认桌面。
@@ -132,7 +152,20 @@ tools/disable.sh examples/xiaomi-mi-tv-4a/debloat.txt
 
 列表路径相对于运行命令时所在的目录，也可以使用绝对路径。保留原列表及工具生成的恢复记录，方便撤销。手动流程若还需要完整的应用和设置快照，应在停用前另行保存；`tools/disable.sh` 不会生成该快照。
 
-### 3. 编译和安装桌面
+### 3. 安装桌面 APK
+
+按[上面的 ADB 安装步骤](#用-adb-安装桌面)安装发布版。
+
+<details>
+<summary>维护者发布 APK</summary>
+
+在仓库的 Actions secrets 中配置长期使用的签名密钥。将 keystore 的 Base64 内容存入 `LAUNCHER_RELEASE_KEYSTORE_BASE64`，另设 `LAUNCHER_RELEASE_STORE_PASSWORD`、`LAUNCHER_RELEASE_KEY_ALIAS`、`LAUNCHER_RELEASE_KEY_PASSWORD`。备份密钥并在后续版本继续使用同一把密钥，已安装的用户才能覆盖升级。
+
+更新 `launcher/app/build.gradle` 的 `versionName` 并递增 `versionCode`，提交后创建并推送对应的标签（如 `launcher-v3.4`）。发布工作流会运行测试、构建并验证签名，然后把 `CleanYourTV.apk` 上传到该标签的 Release。
+
+</details>
+
+### 从源码编译和安装桌面
 
 桌面使用 Java 和 AndroidX RecyclerView，应用包名为 `com.gathin.tvhome`。编译需要 JDK 17、Android SDK Platform 34 和 Build Tools 34.0.0。macOS 可安装：
 
@@ -167,7 +200,7 @@ tools\venv\Scripts\python.exe -m pip install -r tools\requirements.txt
 powershell -ExecutionPolicy Bypass -File launcher\build-and-install.ps1 -TvHost 192.168.1.50
 ```
 
-PowerShell 安装脚本使用 `-StockLauncher <包名>` 指定原始桌面，或使用 `-StockLauncher none` 保留其启用状态。当前 PowerShell 脚本会先请求设置新 HOME，再检查新桌面是否启动，与上述 Shell 脚本的顺序不同；操作前请确认 ADB 恢复路径可用。清理与恢复分别使用 [`tools/disable.ps1`](tools/disable.ps1) 和 [`tools/restore.ps1`](tools/restore.ps1)。
+PowerShell 安装脚本使用 `-StockLauncher <包名>` 指定原始桌面，或使用 `-StockLauncher none` 保留其启用状态。脚本先检查新桌面能否启动，再尝试切换默认 HOME。清理与恢复分别使用 [`tools/disable.ps1`](tools/disable.ps1) 和 [`tools/restore.ps1`](tools/restore.ps1)。
 
 ### 工具索引
 

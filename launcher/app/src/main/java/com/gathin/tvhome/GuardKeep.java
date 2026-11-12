@@ -8,6 +8,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.PowerManager;
 import android.os.UserManager;
 import android.provider.Settings;
@@ -34,9 +35,14 @@ final class GuardKeep {
     private GuardKeep() {
     }
 
-    static boolean offInStandby(Context context) {
+    static boolean isUserUnlocked(Context context) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return true;
         UserManager users = context.getSystemService(UserManager.class);
-        if (users != null && !users.isUserUnlocked()) return false;
+        return users == null || users.isUserUnlocked();
+    }
+
+    static boolean offInStandby(Context context) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N || !isUserUnlocked(context)) return false;
         return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_OFF, false);
     }
 
@@ -50,9 +56,9 @@ final class GuardKeep {
         // that arrives after that, so the first screen-off does nothing (Philips 65PUS8102).
         HomeKeyService.applyStandbyOptIn();
         if (!offInStandby(context)) return;
-        if (context.checkSelfPermission(Manifest.permission.WRITE_SECURE_SETTINGS)
+        if (androidx.core.content.ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_SECURE_SETTINGS)
                 != PackageManager.PERMISSION_GRANTED) return;
-        PowerManager power = context.getSystemService(PowerManager.class);
+        PowerManager power = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
         // Still off: binding the helper again would sit on the power key. Wait for the screen.
         if (power != null && !power.isInteractive()) {
             watchScreenOn(context.getApplicationContext());
@@ -85,8 +91,10 @@ final class GuardKeep {
 
     /** Drops the service from the list and puts it back on the next SCREEN_ON. The process has to stay up. */
     static void stepOut(AccessibilityService service) {
-        watchScreenOn(service.getApplicationContext());
-        service.disableSelf();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            watchScreenOn(service.getApplicationContext());
+            service.disableSelf();
+        }
     }
 
     private static void watchScreenOn(Context app) {

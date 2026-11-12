@@ -6,6 +6,8 @@ import android.content.pm.PackageManager;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
+import android.net.NetworkInfo;
+import android.os.Build;
 import android.provider.Settings;
 
 /** open_on_start_choice: the app Home opens once after each boot, picked in Launcher settings. */
@@ -46,8 +48,13 @@ final class OpenOnStart {
 
     /** Android has reached the internet through the active network (ACCESS_NETWORK_STATE). */
     static boolean online(Context ctx) {
-        ConnectivityManager cm = ctx.getSystemService(ConnectivityManager.class);
-        Network n = cm != null ? cm.getActiveNetwork() : null;
+        ConnectivityManager cm = (ConnectivityManager) ctx.getSystemService(Context.CONNECTIVITY_SERVICE);
+        if (cm == null) return false;
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+            NetworkInfo active = cm.getActiveNetworkInfo();
+            return active != null && active.isConnected();
+        }
+        Network n = cm.getActiveNetwork();
         NetworkCapabilities caps = n != null ? cm.getNetworkCapabilities(n) : null;
         return caps != null && caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED);
     }
