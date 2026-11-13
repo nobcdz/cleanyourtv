@@ -811,6 +811,12 @@ final class Config {
      * start before the card is mounted (seen at every boot on a Xiaomi MiTV-MTEQ0), and without the copy it comes
      * up with the built-in dock order. A missing file on mounted storage still means no overlay.
      */
+    static boolean restoreMiTv4AdbOnBoot(Context context) {
+        // Use the private copy written by Config.load so early boot can read the opt-in.
+        JSONObject overlay = read(new File(context.getFilesDir(), FILE_NAME));
+        return overlay != null && bool(overlay, "restore_mitv4_adb_on_boot", false);
+    }
+
     private static JSONObject readOverlay(Context ctx, File file, boolean mounted) {
         File copy = new File(ctx.getFilesDir(), FILE_NAME);
         if (!mounted) return read(copy);

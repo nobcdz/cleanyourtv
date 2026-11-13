@@ -9,7 +9,10 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.PowerManager;
+import android.os.SystemClock;
 import android.os.UserManager;
 import android.provider.Settings;
 
@@ -31,6 +34,7 @@ final class GuardKeep {
     private static final String KEY_OFF = "off_in_standby";
 
     private static BroadcastReceiver screenOn;
+    private static boolean adbRestorationScheduled;
 
     private GuardKeep() {
     }
@@ -39,6 +43,48 @@ final class GuardKeep {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return true;
         UserManager users = context.getSystemService(UserManager.class);
         return users == null || users.isUserUnlocked();
+    }
+
+    static void restoreMiTv4AdbOnBoot(Context context) {
+        if (adbRestorationScheduled || Build.VERSION.SDK_INT != Build.VERSION_CODES.M
+                || !"MiTV4".equals(Build.MODEL) || SystemClock.elapsedRealtime() > 120_000
+                || !Config.restoreMiTv4AdbOnBoot(context)
+                || context.checkSelfPermission(Manifest.permission.WRITE_SECURE_SETTINGS)
+                        != PackageManager.PERMISSION_GRANTED) return;
+        adbRestorationScheduled = true;
+        Context app = context.getApplicationContext();
+        Handler handler = new Handler(Looper.getMainLooper());
+        handler.postDelayed(() -> {
+            if (Settings.Global.getInt(app.getContentResolver(), Settings.Global.ADB_ENABLED, 0) == 0) {
+                Settings.Global.putInt(app.getContentResolver(), Settings.Global.ADB_ENABLED, 1);
+            } else if (Settings.Global.putInt(app.getContentResolver(), Settings.Global.ADB_ENABLED, 0)) {
+                handler.postDelayed(() ->
+                        Settings.Global.putInt(app.getContentResolver(), Settings.Global.ADB_ENABLED, 1), 1_000);
+            }
+        }, 15_000);
+        handler.postDelayed(() -> rebindMiTv4HomeKey(app, handler), 25_000);
+    }
+
+    private static void rebindMiTv4HomeKey(Context app, Handler handler) {
+        String key = Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES;
+        String enabled = Settings.Secure.getString(app.getContentResolver(), key);
+        if (enabled == null) return;
+        ComponentName home = new ComponentName(app, HomeKeyService.class);
+        List<String> otherServices = new ArrayList<>();
+        boolean found = false;
+        for (String entry : enabled.split(":")) {
+            if (home.equals(ComponentName.unflattenFromString(entry))) found = true;
+            else if (!entry.isEmpty()) otherServices.add(entry);
+        }
+        if (!found || otherServices.isEmpty()) return;
+        String withoutHome = String.join(":", otherServices);
+        if (!Settings.Secure.putString(app.getContentResolver(), key, withoutHome)) return;
+        handler.postDelayed(() -> {
+            String current = Settings.Secure.getString(app.getContentResolver(), key);
+            if (withoutHome.equals(current)) {
+                Settings.Secure.putString(app.getContentResolver(), key, enabled);
+            }
+        }, 1_000);
     }
 
     static boolean offInStandby(Context context) {

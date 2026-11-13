@@ -228,6 +228,7 @@ public class HomeKeyService extends AccessibilityService {
             setServiceInfo(info);
         }
         if (!stockHome.isEmpty() || !powerOnLiveTv.isEmpty()) probeAtBoot();
+        GuardKeep.restoreMiTv4AdbOnBoot(this);
         armStandbyExit();
         holdAppKeys = RemoteKeys.parseHoldAppKeys(config.appKeys);
         holdAppScancodes = RemoteKeys.parseHoldAppScancodes(config.appKeys);
