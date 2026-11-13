@@ -15,8 +15,8 @@ android {
         applicationId providers.gradleProperty('launcherApplicationId').getOrElse('com.gathin.tvhome')
         minSdk 21
         targetSdk 34
-        versionCode 14
-        versionName '3.4.1'
+        versionCode 15
+        versionName '3.4.2'
     }
 
     signingConfigs {

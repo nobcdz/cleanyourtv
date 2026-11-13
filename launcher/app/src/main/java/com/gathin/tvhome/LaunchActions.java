@@ -1,6 +1,9 @@
 package com.gathin.tvhome;
 
+import android.content.ComponentName;
 import android.content.Intent;
+import android.content.pm.ActivityInfo;
+import android.content.pm.PackageManager;
 import android.net.Uri;
 import java.util.Map;
 import java.util.function.BiFunction;
@@ -9,6 +12,19 @@ import java.util.function.BiFunction;
 final class LaunchActions {
     /** A launch_actions value "view:<uri>" opens that URI in the package instead of sending an action. */
     static final String VIEW_PREFIX = "view:";
+    static final String COMPONENT_PREFIX = "component:";
+
+    static ActivityInfo exportedActivity(PackageManager pm, Intent intent) {
+        ComponentName component = intent.getComponent();
+        if (component == null) return null;
+        try {
+            ActivityInfo activity = pm.getActivityInfo(component, 0);
+            return activity.exported && activity.enabled && activity.applicationInfo.enabled
+                    && activity.permission == null ? activity : null;
+        } catch (PackageManager.NameNotFoundException ignored) {
+            return null;
+        }
+    }
 
     private LaunchActions() {}
 
@@ -39,6 +55,12 @@ final class LaunchActions {
 
     /** The intent for a launch_actions value, limited to its package: ACTION_VIEW on the URI, or the action. */
     static Intent intent(String pkg, String value) {
+        if (value.startsWith(COMPONENT_PREFIX)) {
+            ComponentName component = ComponentName.unflattenFromString(value.substring(COMPONENT_PREFIX.length()));
+            if (component != null && pkg.equals(component.getPackageName())) {
+                return new Intent(Intent.ACTION_MAIN).setComponent(component);
+            }
+        }
         String uri = viewUri(value);
         Intent i = uri != null ? new Intent(Intent.ACTION_VIEW, Uri.parse(uri)) : new Intent(value);
         return i.setPackage(pkg);

@@ -6,6 +6,7 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.content.pm.ActivityInfo;
 import android.content.pm.ResolveInfo;
 import android.content.res.Resources;
 import android.graphics.Bitmap;
@@ -311,6 +312,16 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
                 fresh.add(new Entry(label, component, banner, icon));
             }
         }
+        for (String pkg : favourites) {
+            String action = launchActions.get(pkg);
+            if (pkg.equals(ctx.getPackageName()) || hidden.contains(pkg) || removed.contains(pkg)
+                    || action == null || !action.startsWith(LaunchActions.COMPONENT_PREFIX)) continue;
+            Intent launch = LaunchActions.intent(pkg, action);
+            ActivityInfo activity = LaunchActions.exportedActivity(pm, launch);
+            if (activity == null || fresh.stream().anyMatch(entry -> pkg.equals(entry.pkg))) continue;
+            String label = appLabels.containsKey(pkg) ? appLabels.get(pkg) : String.valueOf(activity.loadLabel(pm));
+            fresh.add(new Entry(Cards.cleanLabel(label, pkg), launch.getComponent(), null, activity.loadIcon(pm)));
+        }
         Collections.sort(fresh, (a, b) -> {
             // The owner's own order first; tiles it does not know (new installs) follow by the rule below.
             int saved = Order.compare(savedRanks, a.component.flattenToShortString(), b.component.flattenToShortString());
@@ -550,7 +561,10 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
             // NEW_TASK only: with RESET_TASK_IF_NEEDED, Android just brings a running task of the app to the front
             // ("Activity not started"), so the screen never opens while the app is up, e.g. MagentaTV's boot-time task.
             Intent byAction = LaunchActions.intent(e.pkg, action).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            if (ctx.getPackageManager().resolveActivity(byAction, 0) != null) i = byAction;
+            PackageManager pm = ctx.getPackageManager();
+            if (action.startsWith(LaunchActions.COMPONENT_PREFIX)
+                    ? LaunchActions.exportedActivity(pm, byAction) != null
+                    : pm.resolveActivity(byAction, 0) != null) i = byAction;
         }
         try {
             ctx.startActivity(i);
