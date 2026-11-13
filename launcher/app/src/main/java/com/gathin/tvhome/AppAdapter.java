@@ -5,6 +5,7 @@ import android.content.ActivityNotFoundException;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ActivityInfo;
 import android.content.pm.ResolveInfo;
@@ -322,7 +323,14 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
             String label = appLabels.containsKey(pkg) ? appLabels.get(pkg) : String.valueOf(activity.loadLabel(pm));
             fresh.add(new Entry(Cards.cleanLabel(label, pkg), launch.getComponent(), null, activity.loadIcon(pm)));
         }
+        Entry originalHome = originalHomeTile(pm, hidden, removed);
+        if (originalHome != null) {
+            fresh.removeIf(entry -> entry.kind == Entry.APP && originalHome.pkg.equals(entry.pkg));
+            if (fresh.stream().noneMatch(entry -> originalHome.pkg.equals(entry.pkg))) fresh.add(originalHome);
+        }
         Collections.sort(fresh, (a, b) -> {
+            if (a == originalHome) return b == originalHome ? 0 : -1;
+            if (b == originalHome) return 1;
             // The owner's own order first; tiles it does not know (new installs) follow by the rule below.
             int saved = Order.compare(savedRanks, a.component.flattenToShortString(), b.component.flattenToShortString());
             if (saved != 0) return saved;
@@ -345,7 +353,7 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
                     ctx.getDrawable(R.drawable.ic_home_settings), null, 0));
         }
         docked = 0;
-        while (docked < fresh.size() && isDocked(fresh.get(docked))) docked++;
+        while (docked < fresh.size() && (fresh.get(docked) == originalHome || isDocked(fresh.get(docked)))) docked++;
         emptySlots = dockRow && !reordering ? DockSlots.empty(docked, dockSize, fresh.size(), fillDock) : 0;
         for (int i = 0; i < emptySlots; i++) {
             fresh.add(docked + i, new Entry(Entry.EMPTY, "", new ComponentName(ctx, "empty-dock-slot-" + i),
@@ -354,6 +362,40 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         items.clear();
         items.addAll(fresh);
         notifyDataSetChanged();
+    }
+
+    private Entry originalHomeTile(PackageManager pm, Set<String> hidden, Set<String> removed) {
+        Intent home = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME);
+        for (ResolveInfo candidate : pm.queryIntentActivities(home, 0)) {
+            ActivityInfo activity = candidate.activityInfo;
+            if (activity == null || candidate.priority < 0 || activity.name.endsWith(".FallbackHome")
+                    || (activity.applicationInfo.flags & ApplicationInfo.FLAG_SYSTEM) == 0) continue;
+            String pkg = activity.packageName;
+            if (pkg.equals(ctx.getPackageName()) || hidden.contains(pkg) || removed.contains(pkg)) continue;
+            String action = launchActions.get(pkg);
+            Intent entry = action != null && action.startsWith(LaunchActions.COMPONENT_PREFIX)
+                    ? LaunchActions.intent(pkg, action) : pm.getLaunchIntentForPackage(pkg);
+            ActivityInfo target = entry == null ? null : LaunchActions.exportedActivity(pm, entry);
+            if (target == null && "com.mitv.tvhome".equals(pkg)) {
+                Intent xiaomiHome = new Intent().setClassName(pkg, "com.mitv.tvhome.MainActivity");
+                target = LaunchActions.exportedActivity(pm, xiaomiHome);
+            }
+            if (target == null) {
+                target = LaunchActions.exportedActivity(pm, new Intent(home).setClassName(pkg, activity.name));
+            }
+            if (target == null) continue;
+            String label = appLabels.containsKey(pkg) ? appLabels.get(pkg) : String.valueOf(target.loadLabel(pm));
+            return new Entry(Cards.cleanLabel(label, pkg), new ComponentName(pkg, target.name),
+                    null, target.loadIcon(pm));
+        }
+        // Older Xiaomi firmware can omit its own launcher from a third-party HOME query.
+        String xiaomi = "com.mitv.tvhome";
+        if (hidden.contains(xiaomi) || removed.contains(xiaomi)) return null;
+        Intent entry = new Intent().setClassName(xiaomi, "com.mitv.tvhome.MainActivity");
+        ActivityInfo target = LaunchActions.exportedActivity(pm, entry);
+        if (target == null || (target.applicationInfo.flags & ApplicationInfo.FLAG_SYSTEM) == 0) return null;
+        String label = appLabels.containsKey(xiaomi) ? appLabels.get(xiaomi) : String.valueOf(target.loadLabel(pm));
+        return new Entry(Cards.cleanLabel(label, xiaomi), entry.getComponent(), null, target.loadIcon(pm));
     }
 
     /** icon_tiles: the app's icon centred on a dark banner-shaped tile, for apps whose own banner crops badly. */
