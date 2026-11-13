@@ -326,11 +326,10 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         Entry originalHome = originalHomeTile(pm, hidden, removed);
         if (originalHome != null) {
             fresh.removeIf(entry -> entry.kind == Entry.APP && originalHome.pkg.equals(entry.pkg));
-            if (fresh.stream().noneMatch(entry -> originalHome.pkg.equals(entry.pkg))) fresh.add(originalHome);
         }
+        boolean showOriginalHome = originalHome != null
+                && fresh.stream().noneMatch(entry -> originalHome.pkg.equals(entry.pkg));
         Collections.sort(fresh, (a, b) -> {
-            if (a == originalHome) return b == originalHome ? 0 : -1;
-            if (b == originalHome) return 1;
             // The owner's own order first; tiles it does not know (new installs) follow by the rule below.
             int saved = Order.compare(savedRanks, a.component.flattenToShortString(), b.component.flattenToShortString());
             if (saved != 0) return saved;
@@ -353,12 +352,17 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
                     ctx.getDrawable(R.drawable.ic_home_settings), null, 0));
         }
         docked = 0;
-        while (docked < fresh.size() && (fresh.get(docked) == originalHome || isDocked(fresh.get(docked)))) docked++;
-        emptySlots = dockRow && !reordering ? DockSlots.empty(docked, dockSize, fresh.size(), fillDock) : 0;
+        while (docked < fresh.size() && isDocked(fresh.get(docked))) docked++;
+        int tileCount = fresh.size() + (showOriginalHome ? 1 : 0);
+        emptySlots = dockRow && !reordering ? DockSlots.empty(docked, dockSize, tileCount, fillDock) : 0;
+        if (showOriginalHome && dockRow && !reordering) {
+            emptySlots = Math.max(emptySlots, dockSize - fresh.size());
+        }
         for (int i = 0; i < emptySlots; i++) {
             fresh.add(docked + i, new Entry(Entry.EMPTY, "", new ComponentName(ctx, "empty-dock-slot-" + i),
                     null, null, null, 0));
         }
+        if (showOriginalHome) fresh.add(Math.min(dockSize, fresh.size()), originalHome);
         items.clear();
         items.addAll(fresh);
         notifyDataSetChanged();

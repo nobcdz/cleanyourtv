@@ -209,7 +209,7 @@ A new key needs one there in the same pull request.
 | `app_glow` | bool | The focus highlight glows in the focused app's colour on every tile, as `cinematic_home` does for the dock (`false` by default) |
 | `fade_rows` | bool | The rows fade out as they scroll up under the clock instead of being cut off at a hard line; the wallpaper or sky shows through. The grid then draws into a hardware layer (about 6 MB of graphics memory at 1080p) (`false` by default) |
 
-CleanYourTV pins the original system launcher first when it can find an activity that other apps can open. Add its package to `hidden_apps` to hide it. For a launcher the system does not report, add its package to `dock_apps` and use a `launch_actions` entry in the form `package=component:package/.Activity`. The component must belong to the listed package and expose a launchable activity. Use `app_labels` to name the tile if needed.
+CleanYourTV places the original system launcher in the first slot below the dock when it can find an activity that other apps can open. Add its package to `hidden_apps` to hide it. For a launcher the system does not report, add its package to `dock_apps` and use a `launch_actions` entry in the form `package=component:package/.Activity`. The component must belong to the listed package and expose a launchable activity. Use `app_labels` to name the tile if needed.
 
 ## Wallpapers
 
